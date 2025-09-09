@@ -73,7 +73,7 @@ $(APP): $(APP).o aont.o blob.o
 
 .PHONY: install
 install: $(APP)
-	mv $^ ~/.local/bin/$^
+	cp --verbose -- $^ ~/.local/bin/$^
 
 -include .deps/*.d
 

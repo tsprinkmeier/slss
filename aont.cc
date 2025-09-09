@@ -379,8 +379,6 @@ public:
              "EVP_DecryptUpdate() returned too much, %d > %zu",
              outl, ret.length());
       ret.resize(outl);
-      std::cerr << "update([" << buff.size() << "]): [" << outl << "]" << std::endl;
-
       return ret;
     };
 
@@ -401,8 +399,6 @@ public:
              "EVP_DecryptFinal_ex() block oversize: %d > %zu",
              outl, ret.length());
       ret.resize(outl);
-
-      std::cerr << "final): [" << outl << "]" << std::endl;
       return ret;
     };
 private:
@@ -454,7 +450,6 @@ void decrypt(const std::string & encrypted,
   {
     // read up to BUFF_SIZE bytes at a time ...
     std::string buff = read(fd, std::min(rem, BUFF_SIZE), true);
-    DUMP(buff);
     // redundant, read() would have attested...
     attest(buff.length(), "unexpected EOF (%zu)", rem);
     // and digest them.
@@ -466,7 +461,6 @@ void decrypt(const std::string & encrypted,
 
   // now read the encrypted key and ensure it's really EOF
   std::string enc = read(fd, digest.length(), true);
-  DUMP(enc);
   std::string eof = read(fd, 1, false);
   attest(eof.length() == 0, "not EOF: %zu", eof.length());
 
@@ -519,9 +513,6 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
   {
     // read next 4K
     std::string buff = read(fd, BUFF_SIZE, false);
-    std::cerr << "readFully(*, " << len << "): ["
-              << cache.length() << "] + "
-              << buff.length() << std::endl;
     eof = (buff.length() == 0);
     if (eof)
     {
@@ -529,10 +520,7 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
 
       std::string enc = encrypter.final();
       digest.update(enc);
-      DUMP(enc);
       cache += enc;
-      std::cerr << "readFully(*, " << len << ") eof: += "
-                << enc.length() << std::endl;
 
       // now get the hash calculated for the ciphertext
       std::string hash = digest.final();
@@ -540,8 +528,6 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
       // XOR it with the key and append
       enc = Xor(encrypter.getIV() + encrypter.getKey(), hash);
       cache += enc;
-      std::cerr << "readFully(*, " << len << ") key: += "
-                << enc.length() << std::endl;
       continue;
     }
     // encrypt the block ...
@@ -549,8 +535,6 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
     // ... and update the hash
     digest.update(enc);
     cache += enc;
-    std::cerr << "readFully(*, " << len << ") enc: += "
-              << enc.length() << std::endl;
   }
   // calculate how much will be returned
   ssize_t ret = std::min(static_cast<ssize_t>(cache.length()), len);
