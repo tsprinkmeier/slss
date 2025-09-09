@@ -1,0 +1,6 @@
+*.html
+*.o
+*.pdf
+.deps
+slss
+
