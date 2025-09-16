@@ -778,7 +778,22 @@ void CreateParity(const uint8_t numData,
   }
 
   uint8_t ** buff = GFM::makeArray(numData + numParity, BLOCKSIZE);
-  EncryptingReader rdr(0);
+  int fd = open(stub.c_str(), O_RDONLY);
+  if (fd == -1)
+  {
+    fd = STDIN_FILENO;
+    std::cerr << "splitting STDIN into ";
+  }
+  else
+  {
+    std::cerr << "splitting \"" << stub << "\" into ";
+  }
+  std::cerr << static_cast<unsigned>(numData + numParity)
+            << " shares named \""
+            << stub << "_xx.tar\", "
+            << static_cast<unsigned>(numData)
+            << " of which are needed to recover" << std::endl;
+  EncryptingReader rdr(fd);
 
   while(1)
   {
@@ -1076,13 +1091,6 @@ int main(int argc, char ** argv)
     const int numRecover = atoi(argv[3]);
     attest((numRecover >= 2) && (numRecover <= numShares),
            "You must specify between 2 and numShares (%d) required shares", numShares);
-
-    std::cerr << "splitting STDIN into "
-              << numShares
-              << " shares named \""
-              << stub << "_xx.tar\", "
-              << numRecover
-              << " of which are needed to recover" << std::endl;
 
     const int numData   = numRecover;
     const int numParity = numShares - numRecover;
