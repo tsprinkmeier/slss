@@ -767,7 +767,8 @@ void CreateParity(const uint8_t numData,
   {
     filename[idx] = MakeFilename(stub, idx);
     fds[idx] = open(filename[idx].c_str(),
-                    O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                    S_IRUSR | S_IWUSR);
     attest(fds[idx], "Unable to open file: '%s'",
            filename[idx].c_str());
 
@@ -1016,18 +1017,27 @@ void RecoverData(const std::string & stub)
   // did we manage to open any files?
   if (!expected.fileNum)
   {
+    std::cerr << "Unable to find any shares of \"" << stub << "\""
+              << std::endl;
     exit(1);
   }
 
   const uint8_t numData   = sig.numData;
   const uint8_t numParity = sig.numParity;
-  attest((numData + numParity) <= 250,
+  const int shares   = static_cast<int>(numData + numParity);
+  const int required = static_cast<int>(numData);
+
+  attest(shares <= 250,
          "Signature invalid, number of files (data + parity) "
          "must not exceed 250: '%s'", stub.c_str());
-
   attest(expected.fileNum >= numData,
-         "Unable to recover, need at least %i files available: '%s'",
-         numData, stub.c_str());
+         "Unable to recover, need at least %i of %i shares of: \"%s\"",
+         shares, required,
+         stub.c_str());
+
+  std::cerr << "Attempting to recover \"" << stub << "\" using "
+            << required << " of "<< shares << " shares."
+            << std::endl;
 
   GFM gfm(numData, numParity);
 
@@ -1040,7 +1050,7 @@ void RecoverData(const std::string & stub)
   }
   const std::string enc = stub + "_aont";
   const int fd = open(enc.c_str(),
-                      O_CREAT | O_EXCL | O_RDWR,
+                      O_WRONLY | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR);
   attest(fd != -1, "open(%s): %m", enc.c_str());
 
