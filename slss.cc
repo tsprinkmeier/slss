@@ -2,7 +2,6 @@
 #include "gfa.hh"
 #include "aont.hh"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fstream>
@@ -32,7 +31,7 @@ static size_t _binary_slss_tar_len = blobSize();
 /// Choose multiples of 512 'cos that's one disk sector.
 /// larger values _might_ make it go faster
 /// but might waste more on partial blocks
-static const uint8_t BLOCKSIZE_Po2 = (9 + 3);  // 512 * 8= 4K
+static const uint8_t BLOCKSIZE_Po2 = 10;
 static const size_t  BLOCKSIZE     = 1 << BLOCKSIZE_Po2;
 
 // Signature prepended to data and parity files.
@@ -200,7 +199,9 @@ public:
       {
         for (int col = 0; col < numData; ++col)
         {
-          assert(d[row][col] == (row == col) ? 1 : 0);
+          attest(d[row][col] == (row == col) ? 1 : 0,
+                 "not UT-I: [%d][%d] = %u",
+                 row, col, (unsigned)d[row][col]);
         }
       }
       // the rest must not be zero
@@ -208,7 +209,7 @@ public:
       {
         for (int col = 0; col < numData; ++col)
         {
-          assert(d[row][col]);
+          attest(d[row][col], "[%d][%d] must not be 0", row, col);
         }
       }
     };
@@ -217,7 +218,7 @@ public:
   virtual ~GFM()
     {
       free(d);
-      d = 0;
+      d = nullptr;
     }
 
   // helper function to create a 2-dimensional array of
@@ -289,7 +290,7 @@ public:
   // mark a data (or parity) set as failed.
   void failData(const uint8_t idx)
     {
-      assert(idx < (numData + numParity));
+      attest(idx < (numData + numParity), "out of range");
       d[idx][numData] = -1;
     }
   void failParity(const uint8_t idx)
@@ -301,7 +302,9 @@ public:
       // -1 == failed
       if (d[idx][numData] == (uint8_t)-1) return true;
       // must be -1 or 0 ...
-      assert(!d[idx][numData]);
+      attest(!d[idx][numData],
+             "unexpected status: [%u]=%u",
+             (unsigned)idx, (unsigned)d[idx][numData]);
       return false;
     }
 
@@ -361,7 +364,7 @@ public:
           while(failed(--tst))
           {
             // make sure we haven't run out of redundancy..
-            assert(tst > (row + 1));
+            attest(tst > (row + 1), "not enough recovery data");
           }
           cpy = tst;
         }
@@ -446,12 +449,13 @@ public:
             b ^= gfa.mult(ret[row][i], tmp[i][col]);
           }
           // assert((tmp * ret) == (ret * tmp))
-          assert(a == b);
+          attest(a == b, "sanity check failed");
           // non-failed rows must be from the identity matrix
           // failed rows must be fully populated
           //a = ret[row][col];
-//                    assert(f ? a : (a == (row == col) ? 1 : 0));
-          assert(f || (a == (row == col) ? 1 : 0));
+          attest(f || (a == (row == col) ? 1 : 0),
+                 "not I-matrix, [%d][%d] = %u",
+                 row, col, (unsigned)a);
         }
       }
       // get rid of the temp matrix and return the recovery one
@@ -585,7 +589,7 @@ public:
         const uint8_t * row = data2[rowIdx];
         for (size_t idx = 0; idx < blockSize; ++idx)
         {
-          assert(row[idx] == (uint8_t)(idx * (rowIdx^idx)));
+          attest(row[idx] == (uint8_t)(idx * (rowIdx^idx)), "sanity check failed!");
         }
       }
 
@@ -664,7 +668,7 @@ void addPadding(uint8_t * buff, const ssize_t numRead, ssize_t expected)
   // how many bytes are missing?
   const ssize_t missing = (expected - numRead);
   // sanity check.....
-  assert(missing > 0);
+  attest(missing > 0, "no room for padding: %zd <= %zd", expected, numRead);
 
   // flag the block as being short
   // missing fewer than 0x80 (128) bytes?
@@ -739,12 +743,12 @@ void CreateParity(const uint8_t numData,
   GFM gfm (numData, numParity);
   int fds[250];//numParity + numData];
   signature sig =
-  {
-    .numData      = numData,
-    .numParity    = numParity,
-    .fileNum      = 0,
-    .blocksizePo2 = BLOCKSIZE_Po2,
-  };
+    {
+      .numData      = numData,
+      .numParity    = numParity,
+      .fileNum      = 0,
+      .blocksizePo2 = BLOCKSIZE_Po2,
+    };
   EVP_MD_CTX * MD_ctx[257];
   std::string filename[257];
 
@@ -763,7 +767,8 @@ void CreateParity(const uint8_t numData,
   {
     filename[idx] = MakeFilename(stub, idx);
     fds[idx] = open(filename[idx].c_str(),
-                    O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                    S_IRUSR | S_IWUSR);
     attest(fds[idx], "Unable to open file: '%s'",
            filename[idx].c_str());
 
@@ -778,7 +783,22 @@ void CreateParity(const uint8_t numData,
   }
 
   uint8_t ** buff = GFM::makeArray(numData + numParity, BLOCKSIZE);
-  EncryptingReader rdr(0);
+  int fd = open(stub.c_str(), O_RDONLY);
+  if (fd == -1)
+  {
+    fd = STDIN_FILENO;
+    std::cerr << "splitting STDIN into ";
+  }
+  else
+  {
+    std::cerr << "splitting \"" << stub << "\" into ";
+  }
+  std::cerr << static_cast<unsigned>(numData + numParity)
+            << " shares named \""
+            << stub << "_xx.tar\", "
+            << static_cast<unsigned>(numData)
+            << " of which are needed to recover" << std::endl;
+  EncryptingReader rdr(fd);
 
   while(1)
   {
@@ -997,18 +1017,27 @@ void RecoverData(const std::string & stub)
   // did we manage to open any files?
   if (!expected.fileNum)
   {
+    std::cerr << "Unable to find any shares of \"" << stub << "\""
+              << std::endl;
     exit(1);
   }
 
   const uint8_t numData   = sig.numData;
   const uint8_t numParity = sig.numParity;
-  attest((numData + numParity) <= 250,
+  const int shares   = static_cast<int>(numData + numParity);
+  const int required = static_cast<int>(numData);
+
+  attest(shares <= 250,
          "Signature invalid, number of files (data + parity) "
          "must not exceed 250: '%s'", stub.c_str());
-
   attest(expected.fileNum >= numData,
-         "Unable to recover, need at least %i files available: '%s'",
-         numData, stub.c_str());
+         "Unable to recover, need at least %i of %i shares of: \"%s\"",
+         shares, required,
+         stub.c_str());
+
+  std::cerr << "Attempting to recover \"" << stub << "\" using "
+            << required << " of "<< shares << " shares."
+            << std::endl;
 
   GFM gfm(numData, numParity);
 
@@ -1016,13 +1045,12 @@ void RecoverData(const std::string & stub)
   {
     if (fds[idx] < 0)
     {
-      std::cerr << "gfm("<<(unsigned)numData<<", "<<(unsigned)numParity<<").failData(" << idx << ")" << std::endl;
       gfm.failData(idx);
     }
   }
   const std::string enc = stub + "_aont";
   const int fd = open(enc.c_str(),
-                      O_CREAT | O_EXCL | O_RDWR,
+                      O_WRONLY | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR);
   attest(fd != -1, "open(%s): %m", enc.c_str());
 
@@ -1036,10 +1064,34 @@ void RecoverData(const std::string & stub)
 #include <iostream>
 #include <string>
 
-void rtfm(const std::string & prog)
+void rtfm(const std::string & prog, const bool copying = false)
 {
-  std::cerr << "\t# " GIT_TAG "\n"
-            << prog <<
+  std::cerr <<
+    "     " << prog << "  Copyright (C) 2025  Thomas Sprinkmeier\n\n";
+  if (copying)
+  {
+    std::cerr <<
+      "    This program is free software: you can redistribute it and/or modify\n"
+      "    it under the terms of the GNU General Public License as published by\n"
+      "    the Free Software Foundation, either version 3 of the License, or\n"
+      "    (at your option) any later version.\n";
+  }
+  else
+  {
+    std::cerr <<
+      "    This program is distributed in the hope that it will be useful,\n"
+      "    but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+      "    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+      "    GNU General Public License for more details.\n";
+  }
+  std::cerr <<
+    "\n"
+    "    You should have received a copy of the GNU General Public License\n"
+    "    along with this program.  If not, see <https://www.gnu.org/licenses/>.\n"
+    "\n"
+    "    run \"" << prog << " show [warranty|copying]\" for details.\n"
+    "\n"
+
     " STUB [NUM_DATA NUM_PARITY]\n"
     "\tSTUB         filename stub for files\n"
     "\tNUM_DATA     number of data files\n"
@@ -1055,12 +1107,20 @@ int main(int argc, char ** argv)
   // Execute built-in test
   GFM::BIT();
 
+  // "show w" and "show u"
+  if ((argc == 3) && !strcmp(argv[1],"show"))
+  {
+    const bool copying = (argv[2][0] == 'c');
+    rtfm(argv[0], copying);
+    return 0;
+  }
+
   // single parameter, recovery mode.
   // Specify the file stub
   if (argc == 2)
   {
     RecoverData(argv[1]);
-    exit(0);
+    return 0;
   }
 
   // 3 parameters, generation mode.
@@ -1077,20 +1137,13 @@ int main(int argc, char ** argv)
     attest((numRecover >= 2) && (numRecover <= numShares),
            "You must specify between 2 and numShares (%d) required shares", numShares);
 
-    std::cerr << "splitting STDIN into "
-              << numShares
-              << " shares named \""
-              << stub << "_xx.tar\", "
-              << numRecover
-              << " of which are needed to recover" << std::endl;
-
     const int numData   = numRecover;
     const int numParity = numShares - numRecover;
 
     CreateParity(numData, numParity, stub);
-    exit(0);
+    return 0;
   }
 
   rtfm(argv[0]);
-  return 0;
+  return 1;
 }

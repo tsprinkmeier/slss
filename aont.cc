@@ -432,13 +432,13 @@ void decrypt(const std::string & encrypted,
   int fd = open(encrypted.c_str(), O_RDONLY);
   attest(fd != -1, "open(%s, RDONLY): %m", encrypted.c_str());
   int fdOut = open(plaintext.c_str(),
-                   O_CREAT | O_EXCL | O_RDWR,
+                    O_WRONLY | O_CREAT | O_TRUNC,
                    S_IRUSR | S_IWUSR);
-  attest(fdOut != -1, "open(%s,RDWR): %m", plaintext.c_str());
+  attest(fdOut != -1, "open(%s, WRONLY): %m", plaintext.c_str());
 
   // find out how big it is
   struct stat buf;
-  int rc = fstat(fd, &buf);
+  const int rc = fstat(fd, &buf);
   attest(rc == 0, "fstat() failed: %m");
 
   // how much of the file is 'data'?
