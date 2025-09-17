@@ -2,7 +2,6 @@
 #include "gfa.hh"
 #include "aont.hh"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fstream>
@@ -32,7 +31,7 @@ static size_t _binary_slss_tar_len = blobSize();
 /// Choose multiples of 512 'cos that's one disk sector.
 /// larger values _might_ make it go faster
 /// but might waste more on partial blocks
-static const uint8_t BLOCKSIZE_Po2 = (9 + 3);  // 512 * 8= 4K
+static const uint8_t BLOCKSIZE_Po2 = 10;
 static const size_t  BLOCKSIZE     = 1 << BLOCKSIZE_Po2;
 
 // Signature prepended to data and parity files.
@@ -200,7 +199,9 @@ public:
       {
         for (int col = 0; col < numData; ++col)
         {
-          assert(d[row][col] == (row == col) ? 1 : 0);
+          attest(d[row][col] == (row == col) ? 1 : 0,
+                 "not UT-I: [%d][%d] = %u",
+                 row, col, (unsigned)d[row][col]);
         }
       }
       // the rest must not be zero
@@ -208,7 +209,7 @@ public:
       {
         for (int col = 0; col < numData; ++col)
         {
-          assert(d[row][col]);
+          attest(d[row][col], "[%d][%d] must not be 0", row, col);
         }
       }
     };
@@ -217,7 +218,7 @@ public:
   virtual ~GFM()
     {
       free(d);
-      d = 0;
+      d = nullptr;
     }
 
   // helper function to create a 2-dimensional array of
@@ -289,7 +290,7 @@ public:
   // mark a data (or parity) set as failed.
   void failData(const uint8_t idx)
     {
-      assert(idx < (numData + numParity));
+      attest(idx < (numData + numParity), "out of range");
       d[idx][numData] = -1;
     }
   void failParity(const uint8_t idx)
@@ -301,7 +302,9 @@ public:
       // -1 == failed
       if (d[idx][numData] == (uint8_t)-1) return true;
       // must be -1 or 0 ...
-      assert(!d[idx][numData]);
+      attest(!d[idx][numData],
+             "unexpected status: [%u]=%u",
+             (unsigned)idx, (unsigned)d[idx][numData]);
       return false;
     }
 
@@ -361,7 +364,7 @@ public:
           while(failed(--tst))
           {
             // make sure we haven't run out of redundancy..
-            assert(tst > (row + 1));
+            attest(tst > (row + 1), "not enough recovery data");
           }
           cpy = tst;
         }
@@ -446,12 +449,13 @@ public:
             b ^= gfa.mult(ret[row][i], tmp[i][col]);
           }
           // assert((tmp * ret) == (ret * tmp))
-          assert(a == b);
+          attest(a == b, "sanity check failed");
           // non-failed rows must be from the identity matrix
           // failed rows must be fully populated
           //a = ret[row][col];
-//                    assert(f ? a : (a == (row == col) ? 1 : 0));
-          assert(f || (a == (row == col) ? 1 : 0));
+          attest(f || (a == (row == col) ? 1 : 0),
+                 "not I-matrix, [%d][%d] = %u",
+                 row, col, (unsigned)a);
         }
       }
       // get rid of the temp matrix and return the recovery one
@@ -585,7 +589,7 @@ public:
         const uint8_t * row = data2[rowIdx];
         for (size_t idx = 0; idx < blockSize; ++idx)
         {
-          assert(row[idx] == (uint8_t)(idx * (rowIdx^idx)));
+          attest(row[idx] == (uint8_t)(idx * (rowIdx^idx)), "sanity check failed!");
         }
       }
 
@@ -664,7 +668,7 @@ void addPadding(uint8_t * buff, const ssize_t numRead, ssize_t expected)
   // how many bytes are missing?
   const ssize_t missing = (expected - numRead);
   // sanity check.....
-  assert(missing > 0);
+  attest(missing > 0, "no room for padding: %zd <= %zd", expected, numRead);
 
   // flag the block as being short
   // missing fewer than 0x80 (128) bytes?
@@ -1100,5 +1104,5 @@ int main(int argc, char ** argv)
   }
 
   rtfm(argv[0]);
-  return 0;
+  return 1;
 }

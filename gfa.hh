@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <iostream>
 #include <stdint.h>
 #include <stdlib.h>
@@ -7,6 +6,9 @@
 #define TAG     std::cerr << __FILE__ "@" << __LINE__ << std::endl
 #define DMP(x)  std::cerr << #x ": " << (x) << std::endl
 #define DMPX(x) std::cerr << #x ": 0x" << std::hex << ((int)(x)) << std::dec << std::endl
+
+// fancy assert
+void attest(bool test, const char * epilogue, ...);
 
 // Gallois Field Arithmatic
 // uses 2 stages of lookup table to speed up arithmatic.
@@ -54,7 +56,7 @@ public:
   // GF log
   uint8_t log(const uint8_t a) const
     {
-      assert(a);
+      attest(a, "cannot log(0)");
       return gflog[a];
     };
 
@@ -87,7 +89,7 @@ public:
   uint8_t div(const uint8_t a, const uint8_t b) const
     {
       // (a / 0) = ERROR for all a
-      assert(b);
+      attest(b, "cannot %u/0", (unsigned)a);
       // (0 / b) = 0 for all b != 0
       if(!a)
       {
