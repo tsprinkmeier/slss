@@ -743,12 +743,12 @@ void CreateParity(const uint8_t numData,
   GFM gfm (numData, numParity);
   int fds[250];//numParity + numData];
   signature sig =
-  {
-    .numData      = numData,
-    .numParity    = numParity,
-    .fileNum      = 0,
-    .blocksizePo2 = BLOCKSIZE_Po2,
-  };
+    {
+      .numData      = numData,
+      .numParity    = numParity,
+      .fileNum      = 0,
+      .blocksizePo2 = BLOCKSIZE_Po2,
+    };
   EVP_MD_CTX * MD_ctx[257];
   std::string filename[257];
 
@@ -1055,10 +1055,34 @@ void RecoverData(const std::string & stub)
 #include <iostream>
 #include <string>
 
-void rtfm(const std::string & prog)
+void rtfm(const std::string & prog, const bool copying = false)
 {
-  std::cerr << "\t# " GIT_TAG "\n"
-            << prog <<
+  std::cerr <<
+    "     " << prog << "  Copyright (C) 2025  Thomas Sprinkmeier\n\n";
+  if (copying)
+  {
+    std::cerr <<
+      "    This program is free software: you can redistribute it and/or modify\n"
+      "    it under the terms of the GNU General Public License as published by\n"
+      "    the Free Software Foundation, either version 3 of the License, or\n"
+      "    (at your option) any later version.\n";
+  }
+  else
+  {
+    std::cerr <<
+      "    This program is distributed in the hope that it will be useful,\n"
+      "    but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+      "    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+      "    GNU General Public License for more details.\n";
+  }
+  std::cerr <<
+    "\n"
+    "    You should have received a copy of the GNU General Public License\n"
+    "    along with this program.  If not, see <https://www.gnu.org/licenses/>.\n"
+    "\n"
+    "    run \"" << prog << " show [warranty|copying]\" for details.\n"
+    "\n"
+
     " STUB [NUM_DATA NUM_PARITY]\n"
     "\tSTUB         filename stub for files\n"
     "\tNUM_DATA     number of data files\n"
@@ -1074,12 +1098,20 @@ int main(int argc, char ** argv)
   // Execute built-in test
   GFM::BIT();
 
+  // "show w" and "show u"
+  if ((argc == 3) && !strcmp(argv[1],"show"))
+  {
+    const bool copying = (argv[2][0] == 'c');
+    rtfm(argv[0], copying);
+    return 0;
+  }
+
   // single parameter, recovery mode.
   // Specify the file stub
   if (argc == 2)
   {
     RecoverData(argv[1]);
-    exit(0);
+    return 0;
   }
 
   // 3 parameters, generation mode.
@@ -1100,7 +1132,7 @@ int main(int argc, char ** argv)
     const int numParity = numShares - numRecover;
 
     CreateParity(numData, numParity, stub);
-    exit(0);
+    return 0;
   }
 
   rtfm(argv[0]);

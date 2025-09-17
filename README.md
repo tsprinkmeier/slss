@@ -5,7 +5,9 @@ and an all-or-nothing transform to provide secure sharing of large secrets.
 
 The secret is split into a specified number of files, a given number of which
 are required to recover the secret. Access to fewer then the required number
-of files for recovery cannot (see "Schneier's Law") reveal any plaintext.
+of files for recovery
+[cannot](https://en.wikipedia.org/wiki/Bruce_Schneier#Cryptography "Schneier's law")
+reveal any plaintext.
 
 All recovery files contain the source to this utility allowing it to be
 re-built if needed for recovery.
