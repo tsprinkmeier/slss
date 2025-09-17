@@ -1035,7 +1035,6 @@ void RecoverData(const std::string & stub)
   {
     if (fds[idx] < 0)
     {
-      std::cerr << "gfm("<<(unsigned)numData<<", "<<(unsigned)numParity<<").failData(" << idx << ")" << std::endl;
       gfm.failData(idx);
     }
   }

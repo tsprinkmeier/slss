@@ -12,6 +12,8 @@ reveal any plaintext.
 All recovery files contain the source to this utility allowing it to be
 re-built if needed for recovery.
 
+## encrypting and splitting a file
+
 To split a secret execute the utility specifying the filename stub,
 number of shares to create and number of shares required to recover:
 
@@ -19,9 +21,9 @@ number of shares to create and number of shares required to recover:
     splitting "my_big_secret_file" into 6 shares named "my_big_secret_file_xx.tar",
         3 of which are needed to recover
     $ ls
-    my_big_secret_file         my_big_secret_file_01.tar  my_big_secret_file_03.tar
-    my_big_secret_file_05.tar  my_big_secret_file_00.tar  my_big_secret_file_02.tar
-    my_big_secret_file_04.tar  my_big_secret_file.sha256
+    my_big_secret_file         my_big_secret_file_02.tar  my_big_secret_file_05.tar
+    my_big_secret_file_00.tar  my_big_secret_file_03.tar  my_big_secret_file.sha256
+    my_big_secret_file_01.tar  my_big_secret_file_04.tar
 
 Note the following files:
 
@@ -30,8 +32,20 @@ Note the following files:
  - my\_big\_secret\_file.sha256 : sha256 checksums of the shares and
  all-or-nothing encrypted secret
 
+## encrypting and splitting a stream
+
+The the secret file does not exist slss will take input from STDIN
+(this avoids the need to ever write the secret to disk):
+
+    $ rm my_big_secret_file
+    $ some_secret_process | slss my_big_secret_file 6 3
+    splitting STDIN into 6 shares named "my_big_secret_file_xx.tar",
+        3 of which are needed to recover
+
 The 6 secret shares are then distributed. The shecksum file should be saved to
 enable verification of the shares.
+
+## recovering the secret
 
 To recover the secret gather the required number of shares and run the utility
 in recovery mode
@@ -49,15 +63,13 @@ in recovery mode
 
     # recover
     $ slss my_big_secret_file
-    gfm(3, 3).failData(0)
-    gfm(3, 3).failData(2)
-    gfm(3, 3).failData(3)
 
     # see that the original secret has been recovered
     $ ls
     my_big_secret_file         my_big_secret_file_04.tar  my_big_secret_file_aont
     my_big_secret_file_01.tar  my_big_secret_file_05.tar  my_big_secret_file.sha256
 
+## recovering slss
 
 To recover the recovery tool extract the nested source tarball and build it:
 
@@ -72,22 +84,18 @@ To recover the recovery tool extract the nested source tarball and build it:
 
     # re-build the recovery tool
     $ ls
-    my_big_secret_file_01.tar  my_big_secret_file.sha256         slss.tar.xz
-    my_big_secret_file_04.tar  slss-0.0.1-0-ga832146-dirty
-    my_big_secret_file_05.tar  slss-0.0.1-0-ga832146-dirty.diff
-    $ make --directory slss-0.0.1-0-ga832146-dirty
+    my_big_secret_file_01.tar  my_big_secret_file.sha256
+    my_big_secret_file_04.tar  slss-<version info>
+    my_big_secret_file_05.tar  slss.tar.xz
+    $ make --directory slss-*/
     ...
 
     # recover using the freshly-built tool
-    $ ./slss-0.0.1-0-ga832146-dirty/slss my_big_secret_file
-    gfm(3, 3).failData(0)
-    gfm(3, 3).failData(2)
-    gfm(3, 3).failData(3)
+    $ ./slss-*/slss my_big_secret_file
     $ ls
-    my_big_secret_file         my_big_secret_file_05.tar  slss-0.0.1-0-ga832146-dirty
-    my_big_secret_file_01.tar  my_big_secret_file_aont    slss-0.0.1-0-ga832146-dirty.diff
-    my_big_secret_file_04.tar  my_big_secret_file.sha256  slss.tar.xz
-
+    my_big_secret_file         my_big_secret_file_05.tar  slss-<version info>
+    my_big_secret_file_01.tar  my_big_secret_file_aont    slss.tar.xz
+    my_big_secret_file_04.tar  my_big_secret_file.sha256
 
 
 This program is based on two papers,
