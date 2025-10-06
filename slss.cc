@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 extern const char _binary_slss_tar_start;
 extern const char _binary_slss_tar_end;
@@ -42,6 +43,13 @@ typedef struct
   uint8_t fileNum;
   uint8_t blocksizePo2;
 }__attribute__ ((aligned(1), packed)) signature;
+
+void rtfm(const std::string & app, const bool copying = false)
+   __attribute__ ((__noreturn__));
+void rtfm_aont(const std::string & app, const bool copying = false)
+   __attribute__ ((__noreturn__));
+void rtfm_gfm(const std::string & app, const bool copying = false)
+   __attribute__ ((__noreturn__));
 
 void attest(bool test, const char * epilogue, ...)
 {
@@ -738,7 +746,8 @@ void PrintMD(FILE * file,
 
 void CreateParity(const uint8_t numData,
                   const uint8_t numParity,
-                  const std::string & stub)
+                  const std::string & stub,
+                  const bool aont = true)
 {
   GFM gfm (numData, numParity);
   int fds[250];//numParity + numData];
@@ -798,7 +807,16 @@ void CreateParity(const uint8_t numData,
             << stub << "_xx.tar\", "
             << static_cast<unsigned>(numData)
             << " of which are needed to recover" << std::endl;
-  EncryptingReader rdr(fd);
+  Reader * pRdr = nullptr;
+  if (aont)
+  {
+    pRdr = new EncryptingReader(fd);
+  }
+  else
+  {
+    pRdr = new Reader(fd);
+  }
+  auto & rdr(*pRdr);
 
   while(1)
   {
@@ -835,6 +853,7 @@ void CreateParity(const uint8_t numData,
       PrintMD(md5File, (stub + "_aont").c_str(), MD_ctx[256]);
       fclose(md5File);
       free(buff);
+      delete pRdr;
       return;
     }
   }
@@ -961,7 +980,7 @@ void RecoverData(const int fd,
 /**
    Recover given only the filename stub.
 */
-void RecoverData(const std::string & stub)
+void RecoverData(const std::string & stub, const bool aont = true)
 {
   int fds[250] = {0,};
 
@@ -1048,7 +1067,7 @@ void RecoverData(const std::string & stub)
       gfm.failData(idx);
     }
   }
-  const std::string enc = stub + "_aont";
+  const std::string enc = stub + (aont ? ".aont" : "");
   const int fd = open(enc.c_str(),
                       O_WRONLY | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR);
@@ -1056,7 +1075,10 @@ void RecoverData(const std::string & stub)
 
   // now that we have opened all the files, start the recovery.
   RecoverData(fd, numData, numParity, gfm, fds);
-  decrypt(enc, stub);
+  if (aont)
+  {
+    decrypt(enc, stub);
+  }
 }
 
 #include "slss.hh"
@@ -1064,10 +1086,10 @@ void RecoverData(const std::string & stub)
 #include <iostream>
 #include <string>
 
-void rtfm(const std::string & prog, const bool copying = false)
+void rtfm_preamble(const std::string & app, const bool copying)
 {
   std::cerr <<
-    "     " << prog << "  Copyright (C) 2025  Thomas Sprinkmeier\n\n";
+    "     " << app << "  Copyright (C) 2025  Thomas Sprinkmeier\n\n";
   if (copying)
   {
     std::cerr <<
@@ -1089,53 +1111,74 @@ void rtfm(const std::string & prog, const bool copying = false)
     "    You should have received a copy of the GNU General Public License\n"
     "    along with this program.  If not, see <https://www.gnu.org/licenses/>.\n"
     "\n"
-    "    run \"" << prog << " show [warranty|copying]\" for details.\n"
-    "\n"
+    "    run \"" << app << " show [warranty|copying]\" for details.\n"
+    "\n";
+}
 
-    " STUB [NUM_DATA NUM_PARITY]\n"
-    "\tSTUB         filename stub for files\n"
-    "\tNUM_DATA     number of data files\n"
-    "\tNUM_PARITY   number of parity files\n"
-            << prog <<
-    "\tDUMP.tar.xz  dump embedded data\n"
+void rtfm(const std::string & app, const bool copying)
+{
+  rtfm_preamble(app, copying);
+
+  std::cerr <<
+    app << " STUB [NUM_SHARES NUM_REQUIRED]\n"
+    "\tSTUB           filename stub for files\n"
+    "\tNUM_SHARES     number of shares to create\n"
+    "\tNUM_RESUIRED   number of shares required to recover\n"
             << std::endl;
   exit(1);
 }
 
-int main(int argc, char ** argv)
+void rtfm_aont(const std::string & app, const bool copying)
 {
-  // Execute built-in test
-  GFM::BIT();
+  rtfm_preamble(app, copying);
 
-  // "show w" and "show u"
-  if ((argc == 3) && !strcmp(argv[1],"show"))
-  {
-    const bool copying = (argv[2][0] == 'c');
-    rtfm(argv[0], copying);
-    return 0;
-  }
+  std::cerr <<
+    app << " [-|PLAINTEXT|CIPHERTEXT.aont]\n"
+    "\tPLAINTEXT       file to encrypt\n"
+    "\tCIPHERTEXT.aont file to decrypt\n"
+            << std::endl;
+  exit(1);
+}
 
+void rtfm_gfm(const std::string & app, const bool copying)
+{
+  rtfm_preamble(app, copying);
+
+  std::cerr <<
+    app << " STUB [NUM_DATA NUM_PARITY]\n"
+    "\tSTUB         filename stub for files\n"
+    "\tNUM_DATA     number of data files\n"
+    "\tNUM_PARITY   number of parity files\n"
+            << std::endl;
+  exit(1);
+}
+
+int slss(const std::string & app, const std::vector<std::string> & args)
+{
   // single parameter, recovery mode.
   // Specify the file stub
-  if (argc == 2)
+  if (args.size() == 1)
   {
-    RecoverData(argv[1]);
+    const std::string & stub(args[0]);
+    RecoverData(stub);
     return 0;
   }
 
   // 3 parameters, generation mode.
   // Specify file stub, number of splits and number required for recovery
   // of parity files to split into.
-  if (argc == 4)
+  if (args.size() == 3)
   {
-    const std::string stub(argv[1]);
-    const int numShares  = atoi(argv[2]);
+    const std::string & stub(args[0]);
+    const int numShares  = atoi(args[1].c_str());
+    const int numRecover = atoi(args[2].c_str());
+
     attest((numShares >= 2) && (numShares <= 240),
            "You must specify between 2 and 240 shares");
 
-    const int numRecover = atoi(argv[3]);
     attest((numRecover >= 2) && (numRecover <= numShares),
-           "You must specify between 2 and numShares (%d) required shares", numShares);
+           "You must specify between 2 and numShares (%d) required shares",
+           numShares);
 
     const int numData   = numRecover;
     const int numParity = numShares - numRecover;
@@ -1144,6 +1187,97 @@ int main(int argc, char ** argv)
     return 0;
   }
 
-  rtfm(argv[0]);
+  rtfm(app);
   return 1;
+}
+
+int aont(const std::string & app, const std::vector<std::string> & args)
+{
+  if (args.size() > 1)
+  {
+    rtfm_aont(app);
+  }
+  if (args.size() == 0)
+  {
+    std::cerr << "AONT-encrypting STDIN to STDOUT" << std::endl;
+    transform("-");
+  }
+  else
+  {
+    const std::string & stub(args[0]);
+    const std::size_t end = stub.size() - 5;
+    if (stub.rfind(".aont") == end)
+    {
+      std::cerr << "AONT-decrypting \"" << stub << "\"" << std::endl;
+      const std::string plaintext(stub.substr(0, end));
+      decrypt(stub, plaintext);
+    }
+    else
+    {
+      std::cerr << "AONT-encrypting \"" << stub << "\"" << std::endl;
+      transform(stub);
+    }
+  }
+  return 0;
+}
+int gfm(const std::string & app, const std::vector<std::string> & args)
+{
+  if (args.size() == 1)
+  {
+    const std::string & stub(args[0]);
+    std::cerr << "Attempting recovery of \"" << stub << "\"" << std::endl;
+    RecoverData(stub, false);
+  }
+  else if (args.size() == 3)
+  {
+    const std::string & stub(args[0]);
+    const int numData   = atoi(args[1].c_str());
+    const int numParity = atoi(args[2].c_str());
+    std::cerr << "Splitting \"" << stub << "\" into ("
+              << numData << " + "
+              << numParity << ") parts"
+              << std::endl;
+    CreateParity(numData, numParity, stub, false);
+  }
+  else
+  {
+    rtfm_gfm(app);
+  }
+  return -1;
+}
+
+int main(int argc, char ** argv)
+{
+  // Execute built-in test
+  GFM::BIT();
+
+  // what are we doing?
+  const std::string app(basename(argv[0]));
+  std::vector<std::string> args;
+  for (int i = 1; i < argc; ++i)
+  {
+    args.push_back(std::string(argv[i]));
+  }
+
+  // "show w[arranty]" and "show c[opying]"
+  if ((args.size() == 2) && (args[0] == "show"))
+  {
+    const bool copying = (*args[1].c_str() == 'c');
+    rtfm(app, copying);
+    return 0;
+  }
+
+  // gfm mode?
+  if (app == "gfm")
+  {
+    return gfm(app, args);
+  }
+
+  // aont mode?
+  if (app == "aont")
+  {
+    return aont(app, args);
+  }
+
+  return slss(app, args);
 }

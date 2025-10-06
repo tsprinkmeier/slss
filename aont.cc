@@ -432,7 +432,7 @@ void decrypt(const std::string & encrypted,
   int fd = open(encrypted.c_str(), O_RDONLY);
   attest(fd != -1, "open(%s, RDONLY): %m", encrypted.c_str());
   int fdOut = open(plaintext.c_str(),
-                    O_WRONLY | O_CREAT | O_TRUNC,
+                   O_WRONLY | O_CREAT | O_TRUNC,
                    S_IRUSR | S_IWUSR);
   attest(fdOut != -1, "open(%s, WRONLY): %m", plaintext.c_str());
 
@@ -494,12 +494,23 @@ void decrypt(const std::string & encrypted,
   attest(eof.length() == 0, "not EOF2: %zu", eof.length());
 }
 
+Reader::Reader(const int _fd)
+  : fd(_fd)
+{;};
+
+ssize_t Reader::readFully(void * pBuff, const ssize_t len)
+{
+  std::string buff = read(fd, len, false);
+  memcpy(pBuff, buff.c_str(), buff.length());
+  return buff.length();
+}
+
 EncryptingReader::EncryptingReader(const int _fd,
                                    const EVP_MD     * md,
                                    const EVP_CIPHER * cipher,
                                    ENGINE           * engine)
 
-  : fd(_fd)
+  : Reader(_fd)
   , eof(false)
   , digest(md, engine)
   , encrypter(cipher, engine)
@@ -542,3 +553,37 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
   cache = cache.substr(ret);
   return ret;
 };
+
+void transform(const std::string & stub)
+{
+  int in  = STDIN_FILENO;
+  int out = STDOUT_FILENO;
+  if (stub != "-")
+  {
+    in = open(stub.c_str(), O_RDONLY);
+    attest(in != -1, "open(%s, RDONLY): %m", stub.c_str());
+    const std::string tmp = stub + ".aont";
+    out = open(tmp.c_str(),
+               O_WRONLY | O_CREAT | O_TRUNC,
+               S_IRUSR | S_IWUSR);
+    attest(out != -1, "open(%s, WRONLY): %m", tmp.c_str());
+  }
+
+  EncryptingReader rdr(in);
+  char buff[BUFF_SIZE];
+  while(1)
+  {
+    ssize_t numRead = rdr.readFully(buff, sizeof(buff));
+    if (numRead == 0)
+    {
+      break;
+    }
+    attest(numRead > 0, "read(%s): %m", stub.c_str());
+
+    ssize_t numWrite = write(out, buff, numRead);
+    attest(numRead == numWrite, "writed(%s): %m", stub.c_str());
+  }
+  close(out);
+}
+
+

@@ -13,6 +13,9 @@ void decrypt(const std::string & encrypted,
              const EVP_CIPHER  * cipher = nullptr,
              ENGINE            * engine = nullptr);
 
+/// apply AONT transformation
+void transform(const std::string & stub);
+
 // forward declatarion to allow friend-ing.
 class Digest2;
 
@@ -77,8 +80,18 @@ private:
   std::string iv;
 };
 
+/// read from given file descryptor without encrpting along the way
+class Reader
+{
+public:
+  Reader(const int _fd);
+  ssize_t readFully(void * pBuff, const ssize_t len);
+protected:
+  int fd;
+};
+
 /// read from given file descryptor, encrpting along the way
-class EncryptingReader
+class EncryptingReader : public Reader
 {
 public:
   EncryptingReader(const int _fd,
@@ -87,7 +100,6 @@ public:
                    ENGINE           * engine = nullptr);
   ssize_t readFully(void * pBuff, const ssize_t len);
 private:
-  int fd;
   bool eof;
   std::string cache;
   Digest2      digest;

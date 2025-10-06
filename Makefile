@@ -1,9 +1,12 @@
+SHELL      = /bin/sh
+
 MACH      ?= $(shell uname --machine)
+APP        = slss
+XTRA       = aont gfm
 MDs        = $(wildcard *.md)
 HTMLs      = $(MDs:.md=.html)
 PDFs       = $(HTMLs:.html=.pdf)
 DOC        = $(HTMLs) $(PDFs)
-APP        = slss
 
 GIT_TAG    = $(APP)-$(shell git describe --tags --dirty --long)
 
@@ -28,6 +31,9 @@ default: $(APP) doc
 .PHONY: doc
 doc: $(DOC)
 
+.PHONY: xtra
+xtra: $(XTRA)
+
 .PHONY: clean
 clean:
 	-rm *.o
@@ -36,7 +42,7 @@ clean:
 
 .PHONY: clobber cleaner
 clobber cleaner: clean
-	-rm $(APP)
+	-rm $(APP) $(XTRA)
 
 .PHONY: remake
 remake: cleaner
@@ -47,6 +53,9 @@ remake: cleaner
 
 %.pdf: %.html
 	html2ps < $^ | ps2pdf - > $@
+
+%.1.gz: %.1
+	gzip --keep --force -- $^
 
 blob.o::
 	test -r $(MACH).objcopy
@@ -65,6 +74,9 @@ blob.o::
 $(APP): $(APP).o aont.o blob.o
 	$(LINK.cc) -MMD $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+$(XTRA): $(APP)
+	ln --force -- $^ $@
+
 %.o: %.cc
 	mkdir --parents .deps
 	$(COMPILE.cc) -MMD $(OUTPUT_OPTION) $<
@@ -72,8 +84,9 @@ $(APP): $(APP).o aont.o blob.o
 	@echo $@: Makefile >> .deps/$*.d
 
 .PHONY: install
-install: $(APP)
-	cp --verbose -- $^ ~/.local/bin/$^
+install: $(APP) $(XTRA) $(APP).1.gz
+	install --mode 0755 $(APP) $(XTRA) ~/.local/bin
+	install --mode 0644 $(APP).1.gz    ~/.local/share/man/man1
 
 -include .deps/*.d
 
