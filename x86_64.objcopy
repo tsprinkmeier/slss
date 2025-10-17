@@ -1,4 +1,0 @@
---output              elf64-x86-64
---binary-architecture i386
---input binary
-slss.tar

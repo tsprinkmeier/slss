@@ -1,9 +1,11 @@
+SHELL      = /bin/bash
+
 MACH      ?= $(shell uname --machine)
+APP        = slss
 MDs        = $(wildcard *.md)
 HTMLs      = $(MDs:.md=.html)
 PDFs       = $(HTMLs:.html=.pdf)
 DOC        = $(HTMLs) $(PDFs)
-APP        = slss
 
 GIT_TAG    = $(APP)-$(shell git describe --tags --dirty --long)
 
@@ -30,7 +32,7 @@ doc: $(DOC)
 
 .PHONY: clean
 clean:
-	-rm *.o
+	-rm *.o *.objcopy
 	-rm -rf .deps
 	-rm $(DOC)
 
@@ -48,8 +50,13 @@ remake: cleaner
 %.pdf: %.html
 	html2ps < $^ | ps2pdf - > $@
 
-blob.o::
-	test -r $(MACH).objcopy
+$(MACH).objcopy: _objcopy
+	# this _should_ work. requires bash >= 4.0. assumes "objdump" starts with the local defaults.
+	objdump --info | awk 'NF == 1' | head --lines 2 > _objdump
+	readarray -t objs < _objdump ; sed --expression "s/__OUTPUT__/$${objs[0]}/"  --expression "s/__BIN_ARCH__/$${objs[1]}/" < _objcopy | tee $@
+	rm _objdump
+
+blob.o:: $(MACH).objcopy
 	git fsck
 	git gc --aggressive
 	git clone . $(GIT_TAG)
@@ -73,7 +80,7 @@ $(APP): $(APP).o aont.o blob.o
 
 .PHONY: install
 install: $(APP)
-	cp --verbose -- $^ ~/.local/bin/$^
+	install --mode 0755 $(APP) ~/.local/bin
 
 -include .deps/*.d
 
