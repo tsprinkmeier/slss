@@ -573,22 +573,31 @@ static void encrypt(int fdIn,
   }
 }
 
+void encrypt(int fdIn,
+             const std::string & encrypted,
+             const EVP_MD      * md,
+             const EVP_CIPHER  * cipher,
+             ENGINE            * engine)
+{
+  int fdOut = open(encrypted.c_str(),
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                   S_IRUSR | S_IWUSR);
+  attest(fdOut != -1, "open(%s, WRONLY): %m", encrypted.c_str());
+
+  encrypt(fdIn, fdOut, md, cipher, engine);
+}
+
 void encrypt(const std::string & plaintext,
              const std::string & encrypted,
              const EVP_MD      * md,
              const EVP_CIPHER  * cipher,
              ENGINE            * engine)
 {
-    // open the file to decrypt
+  // open the file to decrypt
   int fdIn = open(plaintext.c_str(), O_RDONLY);
-  attest(fdIn != -1, "open(%s, RDONLY): %m", encrypted.c_str());
+  attest(fdIn != -1, "open(%s, RDONLY): %m", plaintext.c_str());
 
-  int fdOut = open(encrypted.c_str(),
-                    O_WRONLY | O_CREAT | O_TRUNC,
-                   S_IRUSR | S_IWUSR);
-  attest(fdOut != -1, "open(%s, WRONLY): %m", plaintext.c_str());
-
-  encrypt(fdIn, fdOut, md, cipher, engine);
+  encrypt(fdIn, encrypted, md, cipher, engine);
 }
 
 void encrypt(const EVP_MD      * md,

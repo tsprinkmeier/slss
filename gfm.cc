@@ -44,33 +44,6 @@ typedef struct
 }__attribute__ ((aligned(1), packed)) signature;
 
 
-// extract un-padded file size from v7-format tarball
-size_t blobSize()
-{
-  static_assert(sizeof(signature) == 4, "Signature block should be 4 bytes");
-
-  const size_t rawSize =
-    &_binary_slss_tar_end -
-    &_binary_slss_tar_start;
-
-  char * endptr = 0;
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#endif  // __GNUC__
-  uint32_t s = strtol(
-    (&_binary_slss_tar_start) + 124,
-    &endptr, 8);
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif  // __GNUC__
-  attest(endptr && (*endptr == '\0'),
-         "unable to decode file size from tar header");
-  s += 0x200;
-  attest((s < rawSize),
-         "unable to sensibly decode file size from tar header");
-  return s;
-}
 
 /// Gallois Field Matrix
 class GFM
@@ -585,6 +558,35 @@ public:
     };
 };
 
+// extract un-padded file size from v7-format tarball
+size_t blobSize()
+{
+  GFM::BIT();
+  static_assert(sizeof(signature) == 4, "Signature block should be 4 bytes");
+
+  const size_t rawSize =
+    &_binary_slss_tar_end -
+    &_binary_slss_tar_start;
+
+  char * endptr = 0;
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif  // __GNUC__
+  uint32_t s = strtol(
+    (&_binary_slss_tar_start) + 124,
+    &endptr, 8);
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif  // __GNUC__
+  attest(endptr && (*endptr == '\0'),
+         "unable to decode file size from tar header");
+  s += 0x200;
+  attest((s < rawSize),
+         "unable to sensibly decode file size from tar header");
+  return s;
+}
+
 std::string MakeFilename(const std::string & stub, const int num)
 {
   std::ostringstream o;
@@ -1045,8 +1047,3 @@ void RecoverData(const std::string & stub)
   RecoverData(fd, numData, numParity, gfm, fds);
   decrypt(enc, stub);
 }
-
-#include "slss.hh"
-
-#include <iostream>
-#include <string>
