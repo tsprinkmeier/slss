@@ -2,6 +2,7 @@ SHELL      = /bin/bash
 
 MACH      ?= $(shell uname --machine)
 APP        = slss
+XTRA       = gfm aont
 MDs        = $(wildcard *.md)
 HTMLs      = $(MDs:.md=.html)
 PDFs       = $(HTMLs:.html=.pdf)
@@ -25,7 +26,7 @@ CXXFLAGS += $(shell pkg-config --cflags openssl)
 LDLIBS   += $(shell pkg-config --libs   openssl)
 
 .PHONY: default
-default: $(APP) doc
+default: $(APP) $(XTRA) doc
 
 .PHONY: doc
 doc: $(DOC)
@@ -38,7 +39,7 @@ clean:
 
 .PHONY: clobber cleaner
 clobber cleaner: clean
-	-rm $(APP)
+	-rm $(APP) $(XTRA)
 
 .PHONY: remake
 remake: cleaner
@@ -69,8 +70,11 @@ blob.o:: $(MACH).objcopy
 	objcopy @$(MACH).objcopy $@
 	rm $(APP).tar $(APP).tar.xz
 
-$(APP): $(APP).o aont.o blob.o
+$(APP): $(APP).o aont.o blob.o gfm.o
 	$(LINK.cc) -MMD $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(XTRA): $(APP)
+	ln --force $^ $@
 
 %.o: %.cc
 	mkdir --parents .deps
@@ -79,8 +83,8 @@ $(APP): $(APP).o aont.o blob.o
 	@echo $@: Makefile >> .deps/$*.d
 
 .PHONY: install
-install: $(APP)
-	install --mode 0755 $(APP) ~/.local/bin
+install: $(APP) $(XTRA)
+	install --mode 0755 $(APP) $(XTRA) ~/.local/bin
 
 -include .deps/*.d
 
