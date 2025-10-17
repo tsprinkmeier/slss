@@ -1,0 +1,4 @@
+--output              __OUTPUT__
+--binary-architecture __BIN_ARCH__
+--input binary
+slss.tar

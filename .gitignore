@@ -1,5 +1,6 @@
 *.html
 *.o
+*.objcopy
 *.pdf
 .deps
 slss
