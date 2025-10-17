@@ -52,7 +52,7 @@ blob.o::
 	test -r $(MACH).objcopy
 	git fsck
 	git gc --aggressive
-	git clone . $(GIT_TAG)
+	git clone file://$(shell pwd)/ --depth 1 $(GIT_TAG)
 	git diff > $(GIT_TAG).diff
 	tar --create --file - --sort=name --remove-files \
 		$(GIT_TAG).diff $(GIT_TAG) \
