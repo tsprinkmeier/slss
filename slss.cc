@@ -156,7 +156,7 @@ static void run_aont(const std::vector<std::string> & args)
   }
 
   const std::string encrypted = stub + ".aont";
-  if (access(stub.c_str(), R_OK))
+  if (access(stub.c_str(), R_OK) == 0)
   {
     std::cerr << "encrypt " << stub << " to " << encrypted
               << std::endl;
@@ -240,7 +240,7 @@ int main(int argc, char ** argv)
     else
     {
       const std::string encrypted = stub + ".aont";
-      if (access(stub.c_str(), R_OK))
+      if (access(stub.c_str(), R_OK) == 0)
       {
         std::cerr << "split " << stub << " into " << numShares
                   << " encrypted shares of which " << numRequired
