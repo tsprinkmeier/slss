@@ -1,9 +1,12 @@
+SHELL      = /bin/bash
+
 MACH      ?= $(shell uname --machine)
+APP        = slss
+XTRA       = gfm aont
 MDs        = $(wildcard *.md)
 HTMLs      = $(MDs:.md=.html)
 PDFs       = $(HTMLs:.html=.pdf)
 DOC        = $(HTMLs) $(PDFs)
-APP        = slss
 
 GIT_TAG    = $(APP)-$(shell git describe --tags --dirty --long)
 
@@ -23,20 +26,20 @@ CXXFLAGS += $(shell pkg-config --cflags openssl)
 LDLIBS   += $(shell pkg-config --libs   openssl)
 
 .PHONY: default
-default: $(APP) doc
+default: $(APP) $(XTRA) doc
 
 .PHONY: doc
 doc: $(DOC)
 
 .PHONY: clean
 clean:
-	-rm *.o
+	-rm *.o *.objcopy
 	-rm -rf .deps
 	-rm $(DOC)
 
 .PHONY: clobber cleaner
 clobber cleaner: clean
-	-rm $(APP)
+	-rm $(APP) $(XTRA)
 
 .PHONY: remake
 remake: cleaner
@@ -48,8 +51,13 @@ remake: cleaner
 %.pdf: %.html
 	html2ps < $^ | ps2pdf - > $@
 
-blob.o::
-	test -r $(MACH).objcopy
+$(MACH).objcopy: _objcopy
+	# this _should_ work. requires bash >= 4.0. assumes "objdump" starts with the local defaults.
+	objdump --info | awk 'NF == 1' | head --lines 2 > _objdump
+	readarray -t objs < _objdump ; sed --expression "s/__OUTPUT__/$${objs[0]}/"  --expression "s/__BIN_ARCH__/$${objs[1]}/" < _objcopy | tee $@
+	rm _objdump
+
+blob.o:: $(MACH).objcopy
 	git fsck
 	git gc --aggressive
 	git clone file://$(shell pwd)/ --depth 1 $(GIT_TAG)
@@ -62,8 +70,11 @@ blob.o::
 	objcopy @$(MACH).objcopy $@
 	rm $(APP).tar $(APP).tar.xz
 
-$(APP): $(APP).o aont.o blob.o
+$(APP): $(APP).o aont.o blob.o gfm.o
 	$(LINK.cc) -MMD $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(XTRA): $(APP)
+	ln --force $^ $@
 
 %.o: %.cc
 	mkdir --parents .deps
@@ -72,8 +83,8 @@ $(APP): $(APP).o aont.o blob.o
 	@echo $@: Makefile >> .deps/$*.d
 
 .PHONY: install
-install: $(APP)
-	cp --verbose -- $^ ~/.local/bin/$^
+install: $(APP) $(XTRA)
+	install --mode 0755 $(APP) $(XTRA) ~/.local/bin
 
 -include .deps/*.d
 
