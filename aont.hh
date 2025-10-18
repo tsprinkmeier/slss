@@ -6,10 +6,26 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-/// decrypt given file to STDOUT
+/// decrypt
 void decrypt(const std::string & encrypted,
              const std::string & plaintext,
              const EVP_MD      * md = nullptr,
+             const EVP_CIPHER  * cipher = nullptr,
+             ENGINE            * engine = nullptr);
+// encrypt
+void encrypt(const std::string & plaintext,
+             const std::string & encrypted,
+             const EVP_MD      * md = nullptr,
+             const EVP_CIPHER  * cipher = nullptr,
+             ENGINE            * engine = nullptr);
+// encrypt given file descriptor to given file
+void encrypt(int fdIn,
+             const std::string & encrypted,
+             const EVP_MD      * md = nullptr,
+             const EVP_CIPHER  * cipher = nullptr,
+             ENGINE            * engine = nullptr);
+// encrypt STDIN to STDOUT
+void encrypt(const EVP_MD      * md = nullptr,
              const EVP_CIPHER  * cipher = nullptr,
              ENGINE            * engine = nullptr);
 
