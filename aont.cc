@@ -513,10 +513,14 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
   {
     // read next 4K
     std::string buff = read(fd, BUFF_SIZE, false);
-    eof = (buff.length() == 0);
+    if (!eof && (buff.length() == 0))
+    {
+      close(fd);
+      fd = -1;
+      eof=true;
+    }
     if (eof)
     {
-      fd = -1;
 
       std::string enc = encrypter.final();
       digest.update(enc);
@@ -542,3 +546,63 @@ ssize_t EncryptingReader::readFully(void * pBuff, const ssize_t len)
   cache = cache.substr(ret);
   return ret;
 };
+
+
+// encrypt STDIN to STDOUT
+static void encrypt(int fdIn,
+                    int fdOut,
+                    const EVP_MD      * md,
+                    const EVP_CIPHER  * cipher,
+                    ENGINE            * engine)
+{
+  EncryptingReader rdr(fdIn, md, cipher, engine);
+
+  char buff[4096];
+  while(1)
+  {
+    const ssize_t numRead = rdr.readFully(buff, sizeof(buff));
+    if (numRead == 0)
+    {
+      close(fdOut);
+      return;
+    }
+    attest(numRead > 0, "read error: %m");
+    const ssize_t numWritten = write(fdOut, buff, numRead);
+    attest(numWritten == numRead, "write error (%zd != %zd): %m",
+           numWritten, numRead);
+  }
+}
+
+void encrypt(int fdIn,
+             const std::string & encrypted,
+             const EVP_MD      * md,
+             const EVP_CIPHER  * cipher,
+             ENGINE            * engine)
+{
+  int fdOut = open(encrypted.c_str(),
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                   S_IRUSR | S_IWUSR);
+  attest(fdOut != -1, "open(%s, WRONLY): %m", encrypted.c_str());
+
+  encrypt(fdIn, fdOut, md, cipher, engine);
+}
+
+void encrypt(const std::string & plaintext,
+             const std::string & encrypted,
+             const EVP_MD      * md,
+             const EVP_CIPHER  * cipher,
+             ENGINE            * engine)
+{
+  // open the file to decrypt
+  int fdIn = open(plaintext.c_str(), O_RDONLY);
+  attest(fdIn != -1, "open(%s, RDONLY): %m", plaintext.c_str());
+
+  encrypt(fdIn, encrypted, md, cipher, engine);
+}
+
+void encrypt(const EVP_MD      * md,
+             const EVP_CIPHER  * cipher,
+             ENGINE            * engine)
+{
+  encrypt(STDIN_FILENO, STDOUT_FILENO, md, cipher, engine);
+}
