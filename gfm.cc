@@ -1,6 +1,5 @@
 #include "slss.hh"
 #include "gfa.hh"
-#include "aont.hh"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -773,26 +772,12 @@ void CreateParity(const uint8_t numData,
 
   uint8_t ** buff = GFM::makeArray(numData + numParity, BLOCKSIZE);
   int fd = open(stub.c_str(), O_RDONLY);
-  if (fd == -1)
-  {
-    fd = STDIN_FILENO;
-    std::cerr << "splitting STDIN into ";
-  }
-  else
-  {
-    std::cerr << "splitting \"" << stub << "\" into ";
-  }
-  std::cerr << static_cast<unsigned>(numData + numParity)
-            << " shares named \""
-            << stub << "_xx.tar\", "
-            << static_cast<unsigned>(numData)
-            << " of which are needed to recover" << std::endl;
-  EncryptingReader rdr(fd);
+  attest(fd != -1, "Unable to open \"%s\": %m", stub.c_str());
 
   while(1)
   {
     memset(buff[0], 0, numData * BLOCKSIZE);
-    ssize_t numRead = rdr.readFully(buff[0], (numData * BLOCKSIZE) - 1);
+    ssize_t numRead = readFully(fd, buff[0], (numData * BLOCKSIZE) - 1);
     addPadding(buff[0], numRead, (numData * BLOCKSIZE) - 1);
     // calc parity
     gfm.parity(buff, BLOCKSIZE);
@@ -821,7 +806,7 @@ void CreateParity(const uint8_t numData,
     // done?
     if (last)
     {
-      PrintMD(md5File, (stub + "_aont").c_str(), MD_ctx[256]);
+      PrintMD(md5File, stub.c_str(), MD_ctx[256]);
       fclose(md5File);
       free(buff);
       return;
@@ -1013,20 +998,6 @@ void RecoverData(const std::string & stub)
 
   const uint8_t numData   = sig.numData;
   const uint8_t numParity = sig.numParity;
-  const int shares   = static_cast<int>(numData + numParity);
-  const int required = static_cast<int>(numData);
-
-  attest(shares <= 250,
-         "Signature invalid, number of files (data + parity) "
-         "must not exceed 250: '%s'", stub.c_str());
-  attest(expected.fileNum >= numData,
-         "Unable to recover, need at least %i of %i shares of: \"%s\"",
-         shares, required,
-         stub.c_str());
-
-  std::cerr << "Attempting to recover \"" << stub << "\" using "
-            << required << " of "<< shares << " shares."
-            << std::endl;
 
   GFM gfm(numData, numParity);
 
@@ -1037,13 +1008,11 @@ void RecoverData(const std::string & stub)
       gfm.failData(idx);
     }
   }
-  const std::string enc = stub + "_aont";
-  const int fd = open(enc.c_str(),
+  const int fd = open(stub.c_str(),
                       O_WRONLY | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR);
-  attest(fd != -1, "open(%s): %m", enc.c_str());
+  attest(fd != -1, "open(%s,WRONLY): %m", stub.c_str());
 
   // now that we have opened all the files, start the recovery.
   RecoverData(fd, numData, numParity, gfm, fds);
-  decrypt(enc, stub);
 }
