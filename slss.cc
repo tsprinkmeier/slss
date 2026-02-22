@@ -61,8 +61,16 @@ static void rtfm_aont(const std::string & prog, const bool copying)
 {
   rtfm(prog, copying);
   std::cerr <<
-    " " << prog << " [STUB[.aont]]\n"
-    "\tSTUB           filename to encode or decode\n"
+    "\t" << prog << " [-]\n"
+    "\t\tencrypt STDIN to STDOUT\n"
+            << std::endl;
+  std::cerr <<
+    "\t" << prog << " STUB\n"
+    "\t\tencrypt STUB (if it exists) or STDIN to STUB.aont\n"
+            << std::endl;
+  std::cerr <<
+    "\t" << prog << " STUB.aont\n"
+    "\t\tdecrypt STUB.aont to STUB\n"
             << std::endl;
   exit(1);
 }
@@ -71,7 +79,7 @@ static void rtfm_gfm(const std::string & prog, const bool copying)
 {
   rtfm(prog, copying);
   std::cerr <<
-    " STUB [NUM_SHARES NUM_REQUIRED]\n"
+    prog << " STUB [NUM_SHARES NUM_REQUIRED]\n"
     "\tSTUB           filename stub for files to split or recover\n"
     "\tNUM_SHARES     number of shares to create\n"
     "\tNUM_REQUIRED   number of shares required to recover\n"
@@ -83,7 +91,7 @@ static void rtfm_slss(const std::string & prog, const bool copying)
 {
   rtfm(prog, copying);
   std::cerr <<
-    " STUB [NUM_SHARES NUM_REQUIRED]\n"
+    prog << " STUB [NUM_SHARES NUM_REQUIRED]\n"
     "\tSTUB           filename stub for files to encrypt and split\n"
     "\t               or recover and decrypt\n"
     "\tNUM_SHARES     number of shares to create\n"
