@@ -214,12 +214,15 @@ int main(int argc, char ** argv)
     }
     else
     {
-      attest(ends_with(stub, ".aont"), "expected stub to end with \".aont\"");
-      const std::string plaintext(stub.substr(0, stub.size()-5));
+      const size_t len = stub.size();
+      // does stub "already have aont" extension?
+      const bool aha =  ends_with(stub, ".aont");
+      const std::string proc(stub + (aha ? "" : ".aont"));
+      const std::string plaintext(stub.substr(0,len-(aha ? 5 : 0)));
       std::cerr << "recovering and decrypting " << plaintext
                 << std::endl;
-      RecoverData(stub);
-      decrypt(stub, plaintext);
+      RecoverData(proc);
+      decrypt(proc, plaintext);
     }
     exit(0);
   }
