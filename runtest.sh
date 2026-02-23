@@ -33,11 +33,17 @@ make
 ./slss 1 2 || true
 
 DIR=$( mktemp --directory )
-
 # Plainetxt
 PLAINTEXT=$( date ; uptime ; free )
 echo "${PLAINTEXT}" > ${DIR}/plaintext
 md5sum < ${DIR}/plaintext > ${DIR}/md5sum
+
+#                               m
+#         mmm    mmm   m mm   mm#mm
+#        "   #  #" "#  #"  #    #
+#        m"""#  #   #  #   #    #
+#        "mm"#  "#m#"  #   #    "mm
+
 # AONT encrypt
 # implicit and explicit STDIN to STDOUT
 ./aont    > "${DIR}/banana0.aont" < "${DIR}/plaintext"
@@ -59,15 +65,49 @@ md5sum --check ${DIR}/md5sum < ${DIR}/banana1
 md5sum --check ${DIR}/md5sum < ${DIR}/banana2
 md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
 
-exit 0
+#                 m""
+#         mmmm  mm#mm  mmmmm
+#        #" "#    #    # # #
+#        #   #    #    # # #
+#        "#m"#    #    # # #
+#         m  #
+#          ""
 
-echo banana | ./gfm ${DIR}/banana 3 2
+# encode
+./gfm "${DIR}/plaintext" 3 2
+# remove a file
+rm "${DIR}/plaintext_01.tar"
+# recover
+./gfm "${DIR}/plaintext"
+# check
+md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
+
+# retrieve tarball
 pushd  ${DIR}/
-tar --extract                 --file banana_01.gfm.tar
+tar --extract --file "${DIR}/plaintext_02.tar" || true
 tar --extract --auto-compress --file slss.tar.xz
 pushd ./slss*/
 make
 popd
-./slss*/gfm banana
-md5sum banana
+popd
 
+#               ""#
+#         mmm     #     mmm    mmm
+#        #   "    #    #   "  #   "
+#         """m    #     """m   """m
+#        "mmm"    "mm  "mmm"  "mmm"
+
+# encode
+./slss "${DIR}/plaintext" 3 2
+# remove a file
+rm "${DIR}/plaintext.aont_01.tar"
+# recover
+./slss "${DIR}/plaintext"
+# verify
+md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
+# recover
+./slss "${DIR}/plaintext.aont"
+# verify
+md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
+
+ls -alFrt "${DIR}"
