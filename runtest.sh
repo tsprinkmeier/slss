@@ -110,4 +110,21 @@ md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
 # verify
 md5sum --check ${DIR}/md5sum < ${DIR}/plaintext
 
+#                               m                                  m""
+#         mmm    mmm   m mm   mm#mm           m            mmmm  mm#mm  mmmmm
+#        "   #  #" "#  #"  #    #             #           #" "#    #    # # #
+#        m"""#  #   #  #   #    #          """#"""        #   #    #    # # #
+#        "mm"#  "#m#"  #   #    "mm           #           "#m"#    #    # # #
+#                                                          m  #
+#                                                           ""
+./aont "${DIR}/plaintext"
+./gfm  "${DIR}/plaintext.aont" 3 2
+rm     "${DIR}/plaintext.aont_01.tar"
+./slss "${DIR}/plaintext"
+
+./slss "${DIR}/plaintext" 3 2
+rm     "${DIR}/plaintext.aont_01.tar"
+./gfm  "${DIR}/plaintext.aont"
+./aont "${DIR}/plaintext.aont"
+
 ls -alFrt "${DIR}"
