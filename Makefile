@@ -86,6 +86,10 @@ $(XTRA): $(APP)
 install: $(APP) $(XTRA)
 	install --mode 0755 $(APP) $(XTRA) ~/.local/bin
 
+.PHONY: check
+check:
+	./runtest.sh
+
 -include .deps/*.d
 
 .PHONY: apt
